@@ -1,15 +1,16 @@
 #include <stdio.h>
 
-#define _In_
-#define _Out_
-#define _Out_opt_
+//#define _In_
+//#define _Out_
+//#define _Out_opt_
 #define C_ASSERT(expr)
 #define DEVICE_TYPE ULONG
 
 #include "reactos/sdk/include/host/typedefs.h"
-#include "reactos/sdk/include/psdk/guiddef.h"
+#define DECLSPEC_SELECTANY
+#include "reactos/sdk/include/psdk/initguid.h"
 
-typedef LARGE_INTEGER PHYSICAL_ADDRESS, *PPHYSICAL_ADDRESS;
+//typedef LARGE_INTEGER PHYSICAL_ADDRESS, *PPHYSICAL_ADDRESS;
 
 typedef enum _BL_DEVICE_TYPE
 {
@@ -90,11 +91,11 @@ typedef struct _EFI_PARTITION_ENTRY
 
 typedef struct _PARTITION_TABLE_ENTRY
 {
-	UCHAR BootIndicator;				// 0
+	UCHAR BootIndicator;	// 0
 	UCHAR StartHead;
 	UCHAR StartSector;
 	UCHAR StartCylinder;
-	UCHAR SystemIndicator;				// 4
+	UCHAR SystemIndicator;	// 4
 	UCHAR EndHead;
 	UCHAR EndSector;
 	UCHAR EndCylinder;
@@ -111,20 +112,14 @@ typedef struct _MASTER_BOOT_RECORD
 	USHORT MasterBootRecordMagic;				// 510
 } MASTER_BOOT_RECORD, *PMASTER_BOOT_RECORD;
 
-/* Tag for Fstub allocations */
-#define TAG_FSTUB 'BtsF'
 /* Partition entry size (bytes) - FIXME: It's hardcoded as Microsoft does, but according to specs, it shouldn't be */
 #define PARTITION_ENTRY_SIZE 128
 /* Defines "EFI PART" */
 #define EFI_HEADER_SIGNATURE 0x5452415020494645ULL
-/* Defines version 1.0 */
-#define EFI_HEADER_REVISION_1 0x00010000
 /* Defines system type for MBR showing that a GPT is following */
 #define EFI_PMBR_OSTYPE_EFI 0xEE
 /* Defines size to store a complete GUID + null char */
 #define EFI_GUID_STRING_SIZE 0x27
-
-#include "reactos/boot/environ/include/bcd.h"
 
 typedef enum _BL_BOOT_TYPE
 {
@@ -132,32 +127,30 @@ typedef enum _BL_BOOT_TYPE
 	UEFI_BOOT = 2,
 } BOOT_TYPE;
 
+#include "reactos/boot/environ/include/bcd.h"
+
 DEFINE_GUID(GUID_WINDOWS_BOOTMGR,
 			0x9DEA862C,
 			0x5CDD,
 			0x4E70,
 			0xAC, 0xC1, 0xF3, 0x2B, 0x34, 0x4D, 0x47, 0x95);
 
-int DiskSectorRead(char *data, char *device_name, ULONGLONG lba)
+int DiskSectorRead(void *data, const char *deviceName, ULONGLONG lba)
 {
 	if (data == NULL)
 	{
-		return 0;
+		return -1;
 	}
-	if (device_name == NULL)
+	if (deviceName == NULL)
 	{
-		return 0;
+		return -1;
 	}
-#if 0
-	FILE *fp = fopen("../MBR.bin", "rb");
-#else
 	char filename[PATH_MAX];
-	sprintf(filename, "/dev/%s", device_name);
+	sprintf(filename, "/dev/%s", deviceName);
 	FILE *fp = fopen(filename, "rb");
-#endif
 	if (fp == NULL)
 	{
-		return 0;
+		return -1;
 	}
 	fseek(fp, lba * 512, SEEK_SET);
 	int dsize = fread(data, 1, 512, fp);
@@ -165,7 +158,7 @@ int DiskSectorRead(char *data, char *device_name, ULONGLONG lba)
 	return dsize;
 }
 
-PBCD_DEVICE_OPTION BcdElementDeviceRead(char *filename)
+PBCD_DEVICE_OPTION BcdElementDeviceRead(const char *filename)
 {
 	if (filename == NULL)
 	{
@@ -225,21 +218,21 @@ void BcdElementDevicePrint(PBCD_DEVICE_OPTION device)
 	return;
 }
 
-PBCD_DEVICE_OPTION BcdElementDeviceUpdate(PBCD_DEVICE_OPTION device, char *device_name, int boot_type)
+PBCD_DEVICE_OPTION BcdElementDeviceUpdate(PBCD_DEVICE_OPTION device, const char *deviceName)
 {
 	if (device == NULL)
 	{
 		return NULL;
 	}
-	if (device_name == NULL)
+	if (deviceName == NULL)
 	{
 		return NULL;
 	}
-	if ((device_name[0] == 's') &&
-		(device_name[1] == 'd') &&
-		(device_name[2] >= 'a') && (device_name[2] <= 'z') &&
-		(device_name[3] >= '1') && (device_name[3] <= '4') &&
-		(device_name[4] == '\0'))
+	if ((deviceName[0] == 's') &&
+		(deviceName[1] == 'd') &&
+		(deviceName[2] >= 'a') && (deviceName[2] <= 'z') &&
+		(deviceName[3] >= '1') && (deviceName[3] <= '4') &&
+		(deviceName[4] == '\0'))
 	{
 	}
 	else
@@ -247,36 +240,44 @@ PBCD_DEVICE_OPTION BcdElementDeviceUpdate(PBCD_DEVICE_OPTION device, char *devic
 		return NULL;
 	}
 	int dsize = 0;
-	PMASTER_BOOT_RECORD mbr = NULL;
-	PEFI_PARTITION_HEADER gpt = NULL;
-	char disk_name[4];
-	disk_name[0] = device_name[0];
-	disk_name[1] = device_name[1];
-	disk_name[2] = device_name[2];
-	disk_name[3] = '\0';
-	if (dsize == 512)
+	char diskName[4];
+	diskName[0] = deviceName[0];
+	diskName[1] = deviceName[1];
+	diskName[2] = deviceName[2];
+	diskName[3] = '\0';
+	PMASTER_BOOT_RECORD mbr = malloc(512);
+	PEFI_PARTITION_HEADER gpt = malloc(512);
+	int boot = BIOS_BOOT;
+	dsize = DiskSectorRead(mbr, diskName, 0);
+	dsize = DiskSectorRead(gpt, diskName, 1);
+	if (gpt->Signature == EFI_HEADER_SIGNATURE)
+	{
+		boot = UEFI_BOOT;
+	}
+	if (boot == BIOS_BOOT)
 	{
 		// MBR
-		mbr = malloc(512);
-		dsize = DiskSectorRead(mbr, disk_name, 0);
 		device->DeviceDescriptor.DeviceType = PartitionDevice;
 		device->DeviceDescriptor.Size = sizeof(ULONG) * 4 + sizeof(device->DeviceDescriptor.Mbr);
-		device->DeviceDescriptor.Mbr.DiskNumber = 1 + device_name[2] - 'a';
-		device->DeviceDescriptor.Mbr.Offset = 512ULL * mbr->PartitionTable[device_name[3] - '1'].SectorCountBeforePartition;
+		device->DeviceDescriptor.Mbr.DiskNumber = 1 + deviceName[2] - 'a';
+		device->DeviceDescriptor.Mbr.Offset = 512ULL * mbr->PartitionTable[deviceName[3] - '1'].SectorCountBeforePartition;
 		device->DeviceDescriptor.Mbr.Signature = mbr->Signature;
 	}
-	if (1 == 2)
+	else if (boot == UEFI_BOOT)
 	{
 		// GPT
-		gpt = malloc(512);
-		dsize = DiskSectorRead(gpt, disk_name, 1);
+		device->DeviceDescriptor.DeviceType = PartitionDevice;
 		device->DeviceDescriptor.Size = sizeof(ULONG) * 4 + sizeof(device->DeviceDescriptor.Gpt);
 		device->DeviceDescriptor.Gpt.DiskSignature = gpt->DiskGUID;
-		ULONGLONG lba = gpt->PartitionEntryLBA + (device_name[3] - '1') / 4;
-		dsize = DiskSectorRead(gpt, disk_name, lba);
-		PEFI_PARTITION_ENTRY gpt_entry = gpt;
-		gpt_entry = gpt_entry + (device_name[3] - '1') % 4;
+		ULONGLONG lba = gpt->PartitionEntryLBA + (deviceName[3] - '1') / 4;
+		dsize = DiskSectorRead(gpt, diskName, lba);
+		PEFI_PARTITION_ENTRY gpt_entry = malloc(512);
+		gpt_entry = gpt_entry + (deviceName[3] - '1') % 4;
 		device->DeviceDescriptor.Gpt.PartitionSignature = gpt_entry->UniquePartition;
+		if (gpt_entry != NULL)
+		{
+			free(gpt_entry);
+		}
 	}
 	if (mbr != NULL)
 	{
@@ -304,7 +305,7 @@ char *BcdObjectGUIDName(char *name, GUID object)
 	return name;
 }
 
-char *BcdElementFileName(char *name, char *path, GUID object, ULONG element, char *suffix)
+char *BcdElementFileName(char *name, const char *path, GUID object, ULONG element, const char *suffix)
 {
 	if (name == NULL)
 	{
@@ -322,14 +323,14 @@ char *BcdElementFileName(char *name, char *path, GUID object, ULONG element, cha
 	return name;
 }
 
-void *BcdElementFileRead(char *path, GUID object, ULONG element, char *suffix)
+void *BcdElementFileRead(const char *path, GUID object, ULONG element, const char *suffix)
 {
 	char filename[PATH_MAX];
 	BcdElementFileName(filename, path, object, element, suffix);
 	FILE *fp = fopen(filename, "rb");
 	if (fp == NULL)
 	{
-		return 0;
+		return NULL;
 	}
 	fseek(fp, 0, SEEK_END);
 	int dsize = ftell(fp);
@@ -343,56 +344,54 @@ void *BcdElementFileRead(char *path, GUID object, ULONG element, char *suffix)
 	return data;
 }
 
-int BcdElementFileWrite(char *path, GUID object, ULONG element, char *suffix, void *data, int size)
+int BcdElementFileWrite(const char *path, GUID object, ULONG element, const char *suffix, const void *data, int size)
 {
 	char filename[PATH_MAX];
 	BcdElementFileName(filename, path, object, element, suffix);
 	FILE *fp = fopen(filename, "wb");
 	if (fp == NULL)
 	{
-		return 0;
+		return -1;
 	}
 	int dsize = fwrite(data, size, 1, fp);
 	fclose(fp);
 	return dsize;
 }
 
-int BcdElementStringWrite(char *path, GUID object, ULONG element, char *data)
+int BcdElementStringWrite(const char *path, GUID object, ULONG element, const char *data)
 {
-	return BcdElementFileWrite(path, object, element, "sz", data, strlen(data));
+	return BcdElementFileWrite(path, object, element, "sz", (void *)data, strlen(data));
 }
 
-int BcdElementBinaryWrite(char *path, GUID object, ULONG element, void *data, int size)
+int BcdElementBinaryWrite(const char *path, GUID object, ULONG element, const void *data, int size)
 {
 	return BcdElementFileWrite(path, object, element, "bin", data, size);
 }
 
 int main()
 {
-	PBCD_DEVICE_OPTION application_device;
-#if 0
-	application_device = BcdElementDeviceRead("../BCD_Part_0_0_Element.bin");
-#else
-	application_device = malloc(sizeof(BCD_DEVICE_OPTION));
-#endif
-	BcdElementDeviceUpdate(application_device, "sda1", BIOS_BOOT);
-	BcdElementDevicePrint(application_device);
+	PBCD_DEVICE_OPTION ApplicationDevice = malloc(sizeof(BCD_DEVICE_OPTION));
+	BcdElementDeviceUpdate(ApplicationDevice, "sda1");
+	BcdElementDevicePrint(ApplicationDevice);
 	char path[] = "mnt";
-	GUID my_guid;
-	BcdElementBinaryWrite(path, my_guid, BcdLibraryDevice_ApplicationDevice, application_device, sizeof(application_device));
-	BcdElementStringWrite(path, my_guid, BcdLibraryString_ApplicationPath, "\\Windows\\system32\\winload.exe");
-	BcdElementStringWrite(path, my_guid, BcdLibraryString_Description, "Windows 7");
-	BcdElementStringWrite(path, my_guid, BcdLibraryString_PreferredLocale, "zh-CN");
-	BcdElementBinaryWrite(path, my_guid, BcdOSLoaderDevice_OSDevice, NULL, 0);
-	BcdElementStringWrite(path, my_guid, BcdOSLoaderString_SystemRoot, "\\Windows");
+	GUID guid;
+	char guidString[PATH_MAX];
+	BcdObjectGUIDName(guidString, guid);
+	BcdElementBinaryWrite(path, guid, BcdLibraryDevice_ApplicationDevice, ApplicationDevice, sizeof(ApplicationDevice));
+	BcdElementStringWrite(path, guid, BcdLibraryString_ApplicationPath, "\\Windows\\system32\\winload.exe");
+	BcdElementStringWrite(path, guid, BcdLibraryString_Description, "Windows 7");
+	BcdElementStringWrite(path, guid, BcdLibraryString_PreferredLocale, "zh-CN");
+	BcdElementBinaryWrite(path, guid, BcdOSLoaderDevice_OSDevice, NULL, 0);
+	BcdElementStringWrite(path, guid, BcdOSLoaderString_SystemRoot, "\\Windows");
 	BcdElementBinaryWrite(path, GUID_WINDOWS_BOOTMGR, BcdLibraryDevice_ApplicationDevice, NULL, 0);
 	BcdElementStringWrite(path, GUID_WINDOWS_BOOTMGR, BcdLibraryString_Description, "Windows Boot Manager");
-	BcdElementStringWrite(path, GUID_WINDOWS_BOOTMGR, BcdBootMgrObject_DefaultObject, my_guid);
-	BcdElementStringWrite(path, GUID_WINDOWS_BOOTMGR, BcdBootMgrObjectList_DisplayOrder, my_guid);
+	BcdElementStringWrite(path, GUID_WINDOWS_BOOTMGR, BcdBootMgrObject_DefaultObject, guidString);
+	BcdElementStringWrite(path, GUID_WINDOWS_BOOTMGR, BcdBootMgrObjectList_DisplayOrder, guidString);
 	BcdElementBinaryWrite(path, GUID_WINDOWS_BOOTMGR, BcdBootMgrInteger_Timeout, NULL, 0);
-	if (application_device)
+	if (ApplicationDevice)
 	{
-		free(application_device);
+		free(ApplicationDevice);
 	}
 	return 0;
 }
+
