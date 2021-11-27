@@ -49,10 +49,10 @@ int MakeDirs(const char *path)
 
 int CopyFile(const char *source, const char *target)
 {
-	char ch;
+	int ch;
 	int ret = -1;
-	FILE *fr = fopen(source, "r");
-	FILE *fw = fopen(target, "w");
+	FILE *fr = fopen(source, "rb");
+	FILE *fw = fopen(target, "wb");
 	if ((fr != NULL) && (fw != NULL))
 	{
 		while ((ch = fgetc(fr)) != EOF)
@@ -69,6 +69,7 @@ int CopyFile(const char *source, const char *target)
 	{
 		fclose(fw);
 	}
+	printf("Copy %s to %s (%s)\n", source, target, (ret == 0) ? "successfully" : "failed");
 	return ret;
 }
 
@@ -85,14 +86,13 @@ int CopyDirs(const char *source, const char *target)
 	}
 	int ret = MakeDirs(target);
 	struct dirent *entry;
-	char *p = NULL;
 	while (entry = readdir(dp))
 	{
 		if (ret != 0)
 		{
 			break;
 		}
-		if (entry->d_type = DT_REG)
+		if ((entry->d_type == DT_REG) && (entry->d_name[0] != '.'))
 		{
 			char *srcFile = malloc(strlen(source) + strlen(entry->d_name) + 2);
 			char *tgtFile = malloc(strlen(target) + strlen(entry->d_name) + 2);
@@ -101,7 +101,6 @@ int CopyDirs(const char *source, const char *target)
 				sprintf(srcFile, "%s/%s", source, entry->d_name);
 				sprintf(tgtFile, "%s/%s", target, entry->d_name);
 				ret = CopyFile(srcFile, tgtFile);
-				printf("Copy %s to %s (%s)\n", srcFile, tgtFile, (ret == 0) ? "successfully" : "failed");
 				if (srcFile != NULL)
 				{
 					free(srcFile);
@@ -124,3 +123,77 @@ int CopyDirs(const char *source, const char *target)
 	return ret;
 }
 
+int BootFileFix(const char *mountPoint)
+{
+	int ret = 0;
+	DIR *dp = NULL;
+	char source[PATH_MAX];
+	char target[PATH_MAX];
+	sprintf(source, "%s/Windows/Boot/PCAT", mountPoint);
+	dp = opendir(source);
+	if (dp == NULL)
+	{
+		return -1;
+	}
+	struct dirent *entry;
+	while (entry = readdir(dp))
+	{
+		if (ret != 0)
+		{
+			break;
+		}
+		if ((entry->d_type == DT_DIR) && (entry->d_name[0] != '.'))
+		{
+			char *srcFile = malloc(strlen(source) + strlen(entry->d_name) + 2);
+			char *tgtFile = malloc(strlen(mountPoint) + strlen(entry->d_name) + 7);
+			if ((srcFile != NULL) && (tgtFile != NULL))
+			{
+				sprintf(srcFile, "%s/%s", source, entry->d_name);
+				sprintf(tgtFile, "%s/Boot/%s", mountPoint, entry->d_name);
+				ret = CopyDirs(srcFile, tgtFile);
+				if (srcFile != NULL)
+				{
+					free(srcFile);
+				}
+				if (tgtFile != NULL)
+				{
+					free(tgtFile);
+				}
+				if (ret != 0)
+				{
+					break;
+				}
+			}
+		}
+	}
+	if (dp != NULL)
+	{
+		closedir(dp);
+	}
+	if (ret == 0)
+	{
+		sprintf(source, "%s/Windows/Boot/Fonts", mountPoint);
+		sprintf(target, "%s/Boot/Fonts", mountPoint);
+		ret = CopyDirs(source, target);
+	}
+	if (ret == 0)
+	{
+		sprintf(source, "%s/Windows/Boot/Resources", mountPoint);
+		sprintf(target, "%s/Boot/Resources", mountPoint);
+		// optional
+		CopyDirs(source, target);
+	}
+	if (ret == 0)
+	{
+		sprintf(source, "%s/Windows/Boot/PCAT/memtest.exe", mountPoint);
+		sprintf(target, "%s/Boot/memtest.exe", mountPoint);
+		ret = CopyFile(source, target);
+	}
+	if (ret == 0)
+	{
+		sprintf(source, "%s/Windows/Boot/PCAT/bootmgr", mountPoint);
+		sprintf(target, "%s/bootmgr", mountPoint);
+		ret = CopyFile(source, target);
+	}
+	return ret;
+}

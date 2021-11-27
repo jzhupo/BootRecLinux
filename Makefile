@@ -1,9 +1,10 @@
-.PHONY: all
+.PHONY: all clean
 all:
 
 SRC := \
-	BootRecLinux.c \
-	FileUtil.c
+	main.c \
+	FileUtil.c \
+	BcdUtil.c
 
 INC := \
 	reactos/boot/environ/include \
@@ -13,6 +14,7 @@ INC := \
 BIN := BootRec
 
 OBJ := $(patsubst %.c,%.o,$(SRC))
+DEP := $(patsubst %.c,%.d,$(SRC))
 
 all: $(BIN)
 
@@ -21,5 +23,9 @@ $(BIN): $(OBJ)
 
 $(OBJ): flags := $(addprefix -I,$(INC))
 $(OBJ): %.o : %.c
-	gcc $(flags) -c $< -o $@
+	gcc $(flags) -c $< -MD -MF $(patsubst %.o,%.d,$@) -o $@
 
+clean:
+	rm -f $(BIN) $(OBJ) $(DEP)
+
+include $(wildcard $(DEP))
