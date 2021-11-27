@@ -19,6 +19,9 @@ typedef enum _BL_DEVICE_TYPE
 	LocateDevice = 8,
 } BL_DEVICE_TYPE;
 
+#pragma pack(push)
+#pragma pack(1)
+
 typedef struct _BL_DEVICE_DESCRIPTOR
 {
 	ULONG DeviceType;
@@ -107,6 +110,8 @@ typedef struct _MASTER_BOOT_RECORD
 	PARTITION_TABLE_ENTRY PartitionTable[4];  // 446
 	USHORT MasterBootRecordMagic;			  // 510
 } MASTER_BOOT_RECORD, *PMASTER_BOOT_RECORD;
+
+#pragma pack(pop)
 
 /* Partition entry size (bytes) - FIXME: It's hardcoded as Microsoft does, but according to specs, it shouldn't be */
 #define PARTITION_ENTRY_SIZE 128
