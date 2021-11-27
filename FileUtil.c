@@ -123,13 +123,13 @@ int CopyDirs(const char *source, const char *target)
 	return ret;
 }
 
-int BootFileFix(const char *mountPoint)
+int BootFileFix(const char *mountBoot, const char *mountWindows)
 {
 	int ret = 0;
 	DIR *dp = NULL;
 	char source[PATH_MAX];
 	char target[PATH_MAX];
-	sprintf(source, "%s/Windows/Boot/PCAT", mountPoint);
+	sprintf(source, "%s/Windows/Boot/PCAT", mountWindows);
 	dp = opendir(source);
 	if (dp == NULL)
 	{
@@ -145,11 +145,11 @@ int BootFileFix(const char *mountPoint)
 		if ((entry->d_type == DT_DIR) && (entry->d_name[0] != '.'))
 		{
 			char *srcFile = malloc(strlen(source) + strlen(entry->d_name) + 2);
-			char *tgtFile = malloc(strlen(mountPoint) + strlen(entry->d_name) + 7);
+			char *tgtFile = malloc(strlen(mountBoot) + strlen(entry->d_name) + 7);
 			if ((srcFile != NULL) && (tgtFile != NULL))
 			{
 				sprintf(srcFile, "%s/%s", source, entry->d_name);
-				sprintf(tgtFile, "%s/Boot/%s", mountPoint, entry->d_name);
+				sprintf(tgtFile, "%s/Boot/%s", mountBoot, entry->d_name);
 				ret = CopyDirs(srcFile, tgtFile);
 				if (srcFile != NULL)
 				{
@@ -172,27 +172,27 @@ int BootFileFix(const char *mountPoint)
 	}
 	if (ret == 0)
 	{
-		sprintf(source, "%s/Windows/Boot/Fonts", mountPoint);
-		sprintf(target, "%s/Boot/Fonts", mountPoint);
+		sprintf(source, "%s/Windows/Boot/Fonts", mountWindows);
+		sprintf(target, "%s/Boot/Fonts", mountBoot);
 		ret = CopyDirs(source, target);
 	}
 	if (ret == 0)
 	{
-		sprintf(source, "%s/Windows/Boot/Resources", mountPoint);
-		sprintf(target, "%s/Boot/Resources", mountPoint);
+		sprintf(source, "%s/Windows/Boot/Resources", mountWindows);
+		sprintf(target, "%s/Boot/Resources", mountBoot);
 		// optional
 		CopyDirs(source, target);
 	}
 	if (ret == 0)
 	{
-		sprintf(source, "%s/Windows/Boot/PCAT/memtest.exe", mountPoint);
-		sprintf(target, "%s/Boot/memtest.exe", mountPoint);
+		sprintf(source, "%s/Windows/Boot/PCAT/memtest.exe", mountWindows);
+		sprintf(target, "%s/Boot/memtest.exe", mountBoot);
 		ret = CopyFile(source, target);
 	}
 	if (ret == 0)
 	{
-		sprintf(source, "%s/Windows/Boot/PCAT/bootmgr", mountPoint);
-		sprintf(target, "%s/bootmgr", mountPoint);
+		sprintf(source, "%s/Windows/Boot/PCAT/bootmgr", mountWindows);
+		sprintf(target, "%s/bootmgr", mountBoot);
 		ret = CopyFile(source, target);
 	}
 	return ret;
