@@ -50,7 +50,7 @@ const char *languageNames[100] = {
 };
 
 
-int iterateChoiceDevices()
+int iterateChoices()
 {
 	blkid_dev dev;
 	blkid_cache cache;
@@ -70,6 +70,11 @@ int iterateChoiceDevices()
 			deviceNames[deviceNumber] = devname + 5;
 			deviceNumber++;
 		}
+		else if (strncmp(devname, "/dev/nvme", 9) == 0)
+		{
+			deviceNames[deviceNumber] = devname + 5;
+			deviceNumber++;
+		}
 	}
 	blkid_dev_iterate_end(iter);
 	for (int i = 0; i < deviceNumber; i++)
@@ -82,6 +87,21 @@ int iterateChoiceDevices()
 		{
 			choiceInstall->add(deviceNames[i]);
 		}
+	}
+	if (choiceLanguage)
+	{
+		for (int i = 0; ; i++)
+		{
+			if (languageNames[i] != NULL)
+			{
+				choiceLanguage->add(languageNames[i]);
+			}
+			else
+			{
+				break;
+			}
+		}
+		choiceLanguage->value(0);
 	}
 	return 0;
 }
@@ -221,7 +241,7 @@ int main(int argc, char **argv)
 
 	obj = new Fl_Box(FL_FRAME_BOX, 10, 125, 580, 100, "Select location of the Boot drive");
 	obj->align(FL_ALIGN_INSIDE | FL_ALIGN_TOP | FL_ALIGN_LEFT);
-	choiceBoot = new Fl_Choice(70, 190, 80, 25, "Device:");
+	choiceBoot = new Fl_Choice(70, 190, 100, 25, "Device:");
 	Fl_Box *boxBoot = new Fl_Box(FL_NO_BOX, 70, 160, 500, 25, NULL);
 	boxBoot->align(FL_ALIGN_INSIDE | FL_ALIGN_LEFT);
 	choiceBoot->callback((Fl_Callback *)updateDeviceBox, boxBoot);
@@ -231,15 +251,10 @@ int main(int argc, char **argv)
 	choiceCode->add("No");
 	choiceCode->value(0);
 	choiceLanguage = new Fl_Choice(500, 190, 80, 25, "Language:");
-	choiceLanguage->add("zh-CN");
-	choiceLanguage->add("zh-HK");
-	choiceLanguage->add("zh-TW");
-	choiceLanguage->add("en-US");
-	choiceLanguage->value(0);
 
 	obj = new Fl_Box(FL_FRAME_BOX, 10, 235, 580, 100, "Select location of the Installation drive");
 	obj->align(FL_ALIGN_INSIDE | FL_ALIGN_TOP | FL_ALIGN_LEFT);
-	choiceInstall = new Fl_Choice(70, 300, 80, 25, "Device:");
+	choiceInstall = new Fl_Choice(70, 300, 100, 25, "Device:");
 	Fl_Box *boxInstall = new Fl_Box(FL_NO_BOX, 70, 270, 500, 25, NULL);
 	boxInstall->align(FL_ALIGN_INSIDE | FL_ALIGN_LEFT);
 	choiceInstall->callback((Fl_Callback *)updateDeviceBox, boxInstall);
@@ -254,7 +269,7 @@ int main(int argc, char **argv)
 	obj = new Fl_Button(520, 405, 60, 25, "Exit");
 	obj->callback(doExit);
 
-	iterateChoiceDevices();
+	iterateChoices();
 
 	window->end();
 	window->show(argc,argv);
