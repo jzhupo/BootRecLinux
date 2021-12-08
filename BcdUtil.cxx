@@ -179,7 +179,7 @@ PBCD_DEVICE_OPTION BcdElementDeviceRead(const char *filename)
 	fseek(fp, 0, SEEK_END);
 	int dsize = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
-	PBCD_DEVICE_OPTION device = malloc(dsize);
+	PBCD_DEVICE_OPTION device = (PBCD_DEVICE_OPTION)malloc(dsize);
 	if (device != NULL)
 	{
 		fread(device, 1, dsize, fp);
@@ -252,8 +252,8 @@ PBCD_DEVICE_OPTION BcdElementDeviceUpdate(PBCD_DEVICE_OPTION device, const char 
 	diskName[1] = deviceName[1];
 	diskName[2] = deviceName[2];
 	diskName[3] = '\0';
-	PMASTER_BOOT_RECORD mbr = malloc(512);
-	PEFI_PARTITION_HEADER gpt = malloc(512);
+	PMASTER_BOOT_RECORD mbr = (PMASTER_BOOT_RECORD)malloc(512);
+	PEFI_PARTITION_HEADER gpt = (PEFI_PARTITION_HEADER)malloc(512);
 	dsize = DiskSectorRead(mbr, diskName, 0);
 	dsize = DiskSectorRead(gpt, diskName, 1);
 	if (gpt->Signature == EFI_HEADER_SIGNATURE)

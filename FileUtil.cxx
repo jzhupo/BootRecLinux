@@ -94,8 +94,8 @@ int CopyDirs(const char *source, const char *target)
 		}
 		if ((entry->d_type == DT_REG) && (entry->d_name[0] != '.'))
 		{
-			char *srcFile = malloc(strlen(source) + strlen(entry->d_name) + 2);
-			char *tgtFile = malloc(strlen(target) + strlen(entry->d_name) + 2);
+			char *srcFile = (char *)malloc(strlen(source) + strlen(entry->d_name) + 2);
+			char *tgtFile = (char *)malloc(strlen(target) + strlen(entry->d_name) + 2);
 			if ((srcFile != NULL) && (tgtFile != NULL))
 			{
 				sprintf(srcFile, "%s/%s", source, entry->d_name);
@@ -144,8 +144,8 @@ int BootFileFix(const char *mountBoot, const char *mountWindows)
 		}
 		if ((entry->d_type == DT_DIR) && (entry->d_name[0] != '.'))
 		{
-			char *srcFile = malloc(strlen(source) + strlen(entry->d_name) + 2);
-			char *tgtFile = malloc(strlen(mountBoot) + strlen(entry->d_name) + 7);
+			char *srcFile = (char *)malloc(strlen(source) + strlen(entry->d_name) + 2);
+			char *tgtFile = (char *)malloc(strlen(mountBoot) + strlen(entry->d_name) + 7);
 			if ((srcFile != NULL) && (tgtFile != NULL))
 			{
 				sprintf(srcFile, "%s/%s", source, entry->d_name);

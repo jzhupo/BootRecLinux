@@ -282,7 +282,7 @@ typedef struct _BCD_PACKED_ELEMENT
 {
     struct _BCD_PACKED_ELEMENT* NextEntry;
     BcdElementType RootType;
-    BCD_ELEMENT_HEADER;
+    BCD_ELEMENT_HEADER Header;
     UCHAR Data[ANYSIZE_ARRAY];
 } BCD_PACKED_ELEMENT, *PBCD_PACKED_ELEMENT;
 

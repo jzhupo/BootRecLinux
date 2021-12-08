@@ -28,6 +28,8 @@
 #include <FL/Fl_File_Chooser.H>
 #include <FL/x.H>
 
+#include "wimlib.h"
+
 #include <blkid/blkid.h>
 #include "public.h"
 
@@ -40,6 +42,7 @@ Fl_Choice *choiceBoot;
 Fl_Choice *choiceInstall;
 Fl_Choice *choiceEdition;
 Fl_Choice *choiceLanguage;
+Fl_Box *boxExtract;
 const char *deviceNames[10];
 int deviceNumber = 0;
 const char *languageNames[100] = {
@@ -146,36 +149,67 @@ void showFileChooser(void)
 		{
 			if (fileChooser->value(i) != NULL)
 			{
-				inputWim->value(fileChooser->value(i));
-				choiceEdition->add("Windows 7");
+				const char *wimpath = fileChooser->value(i);
+				inputWim->value(wimpath);
+				WIMStruct *wim = NULL;
+				int ret = wimlib_open_wim(wimpath, 0, &wim);
+				if (ret == 0)
+				{
+					wimlib_wim_info info;
+					ret = wimlib_get_wim_info(wim, &info);
+					if (ret == 0)
+					{
+						for (int j = 1; j <= info.image_count; j++)
+						{
+							const char *name = wimlib_get_image_name(wim, j);
+							choiceEdition->add(name);
+							boxExtract->copy_label("Ready");
+						}
+					}
+				}
+				wimlib_free(wim);
 			}
 		}
 	}
 }
 
+#define TO_PERCENT(numerator, denominator) \
+	((float)(((denominator) == 0) ? 0 : ((numerator) * 100 / (float)(denominator))))
+
+static enum wimlib_progress_status
+extract_progress(enum wimlib_progress_msg msg,
+		union wimlib_progress_info *info, void *progctx)
+{
+	switch (msg) {
+	case WIMLIB_PROGRESS_MSG_EXTRACT_STREAMS:
+		char buf[PATH_MAX];
+		sprintf(buf, "Extracting files: %.2f%% complete",
+			TO_PERCENT((info->extract).completed_bytes,
+					(info->extract).total_bytes));
+		printf(buf);
+		printf("\n");
+		boxExtract->copy_label(buf);
+		break;
+	default:
+		break;
+	}
+	return WIMLIB_PROGRESS_STATUS_CONTINUE;
+}
+
 void doSetup(Fl_Widget *, void *)
 {
-	return;
-
+	int ret = 0;
 	const char ntfs3g[] = "/usr/local/bin/ntfs-3g";
 	char mountCommand[PATH_MAX];
 	char deviceBoot[PATH_MAX];
 	sprintf(deviceBoot, "/dev/%s", deviceNames[choiceBoot->value()]);
-	char mountBoot[PATH_MAX];
-	sprintf(mountBoot, "/mnt/%s", deviceNames[choiceBoot->value()]);
 	char deviceInstall[PATH_MAX];
 	sprintf(deviceInstall, "/dev/%s", deviceNames[choiceInstall->value()]);
+	char mountBoot[PATH_MAX];
+	sprintf(mountBoot, "/mnt/%s", deviceNames[choiceBoot->value()]);
 	char mountInstall[PATH_MAX];
 	sprintf(mountInstall, "/mnt/%s", deviceNames[choiceInstall->value()]);
-	int ret = 0;
-	if (strcmp(mountBoot, mountInstall) != 0)
-	{
-		MakeDirs(mountBoot);
-		sprintf(mountCommand, "%s %s %s", ntfs3g, deviceBoot, mountBoot);
-		printf("Command: %s\n", mountCommand);
-		ret = system(mountCommand);
-		printf("Return: %d\n", ret);
-	}
+
 	if (ret == 0)
 	{
 		MakeDirs(mountInstall);
@@ -183,6 +217,35 @@ void doSetup(Fl_Widget *, void *)
 		printf("Command: %s\n", mountCommand);
 		ret = system(mountCommand);
 		printf("Return: %d\n", ret);
+	}
+	if (ret == 0)
+	{
+		const char *wimpath = inputWim->value();
+		const int image_index = choiceEdition->value() + 1;
+		WIMStruct *wim = NULL;
+		int ret = wimlib_open_wim(wimpath, 0, &wim);
+		if (ret == 0)
+		{
+			wimlib_register_progress_function(wim, extract_progress, NULL);
+			int extract_flags = WIMLIB_EXTRACT_FLAG_NTFS;
+			boxExtract->copy_label("Extracting");
+			printf("wimlib_extract_image %d %s %d\n", image_index, mountInstall, extract_flags);
+			ret = wimlib_extract_image(wim, image_index, mountInstall, 0);
+			printf("ret = %d %s\n", ret, wimlib_get_error_string((enum wimlib_error_code)ret));
+			boxExtract->copy_label("Done");
+		}
+		wimlib_free(wim);
+	}
+	if (ret == 0)
+	{
+		if (strcmp(mountBoot, mountInstall) != 0)
+		{
+			MakeDirs(mountBoot);
+			sprintf(mountCommand, "%s %s %s", ntfs3g, deviceBoot, mountBoot);
+			printf("Command: %s\n", mountCommand);
+			ret = system(mountCommand);
+			printf("Return: %d\n", ret);
+		}
 	}
 	if (ret == 0)
 	{
@@ -261,7 +324,9 @@ int main(int argc, char **argv)
 
 	obj = new Fl_Box(FL_FRAME_BOX, 10, 345, 580, 95, "Options");
 	obj->align(FL_ALIGN_INSIDE | FL_ALIGN_TOP | FL_ALIGN_LEFT);
-	choiceEdition = new Fl_Choice(70, 365, 200, 25, "Edition:");
+	choiceEdition = new Fl_Choice(70, 365, 300, 25, "Edition:");
+	boxExtract = new Fl_Box(FL_NO_BOX, 20, 405, 400, 25, "Status");
+	boxExtract->align(FL_ALIGN_INSIDE | FL_ALIGN_LEFT);
 	obj = new Fl_Button(450, 405, 60, 25, "Setup");
 	obj->callback(doSetup);
 	obj = new Fl_Button(510, 365, 70, 25, "BCD Edit");
